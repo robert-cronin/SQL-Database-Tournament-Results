@@ -1,0 +1,7 @@
+Tables to be created:
+
+1 - Matches:
+match_id, round, player_id_1, player_id_2
+
+2 - Players:
+player_id, player_full_name, matches_won
