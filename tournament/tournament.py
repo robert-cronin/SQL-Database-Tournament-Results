@@ -5,39 +5,41 @@
 
 import psycopg2
 
-def connect():
+def connect(database_name="tournament"):
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    try:
+        db = psycopg2.connect("dbname={}.format(database_name)")
+        cursor = db.cursor()
+        return db, cursor
+    except:
+        print("<error message>")
 
 def deleteMatches():
     """Remove all the match records from the database."""
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM Matches;")
-    cur.execute("UPDATE PlayerStanding SET Wins = 0, MatchesPlayed = 0;")
-    conn.commit()
-    conn.close()
+    db, cursor = connect()
+    cursor.execute("DELETE FROM Matches;")
+    cursor.execute("UPDATE PlayerStanding SET Wins = 0, MatchesPlayed = 0;")
+    db.commit()
+    db.close()
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM PlayerStanding cascade;")
-    cur.execute("DELETE FROM Players cascade;")
-    cur.execute("ALTER SEQUENCE Players_PlayerID_seq RESTART WITH 1;")
-    cur.execute("ALTER SEQUENCE PlayerStanding_PlayerID_seq RESTART WITH 1;")
-    cur.execute("ALTER SEQUENCE PlayerStanding_RoundID_seq RESTART WITH 1;")
-    conn.commit()
-    conn.close()
+    db, cursor = connect()
+    cursor.execute("DELETE FROM PlayerStanding cascade;")
+    cursor.execute("DELETE FROM Players cascade;")
+    cursor.execute("ALTER SEQUENCE Players_PlayerID_seq RESTART WITH 1;")
+    cursor.execute("ALTER SEQUENCE PlayerStanding_PlayerID_seq RESTART WITH 1;")
+    cursor.execute("ALTER SEQUENCE PlayerStanding_RoundID_seq RESTART WITH 1;")
+    db.commit()
+    db.close()
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("SELECT count(*) from Players;")
-    return cur.fetchall()[0][0]
+    db, cursor = connect()
+    cursor.execute("SELECT count(*) from Players;")
+    return cursor.fetchall()[0][0]
 
 
 def registerPlayer(name):
@@ -49,12 +51,11 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("""INSERT INTO Players (FullName) VALUES ('%s');"""%name.replace("'", "''"))
-    cur.execute("INSERT INTO PlayerStanding (Wins, MatchesPlayed) VALUES (0, 0)")
-    conn.commit()
-    conn.close()
+    db, cursor = connect()
+    cursor.execute("""INSERT INTO Players (FullName) VALUES ('%s');"""%name.replace("'", "''"))
+    cursor.execute("INSERT INTO PlayerStanding (Wins, MatchesPlayed) VALUES (0, 0)")
+    db.commit()
+    db.close()
 
 
 def playerStandings():
@@ -70,10 +71,9 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("SELECT PlayerStanding.PlayerID, Players.FullName, PlayerStanding.Wins, PlayerStanding.MatchesPlayed FROM PlayerStanding INNER JOIN Players ON Players.PlayerID=PlayerStanding.PlayerID ORDER BY PlayerStanding.Wins desc;")
-    standing = cur.fetchall()    
+    db, cursor = connect()
+    cursor.execute("SELECT PlayerStanding.PlayerID, Players.FullName, PlayerStanding.Wins, PlayerStanding.MatchesPlayed FROM PlayerStanding INNER JOIN Players ON Players.PlayerID=PlayerStanding.PlayerID ORDER BY PlayerStanding.Wins desc;")
+    standing = cursor.fetchall()
     return standing
 
 
@@ -84,14 +84,13 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO Matches (WinnerID, LoserID) VALUES ('%s', '%s');"%(winner, loser))
-    cur.execute("UPDATE PlayerStanding SET Wins=(SELECT Wins FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
-    cur.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
-    cur.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(loser, loser))
-    conn.commit()
-    conn.close()
+    db, cursor = connect()
+    cursor.execute("INSERT INTO Matches (WinnerID, LoserID) VALUES ('%s', '%s');"%(winner, loser))
+    cursor.execute("UPDATE PlayerStanding SET Wins=(SELECT Wins FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
+    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
+    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(loser, loser))
+    db.commit()
+    db.close()
 
 def swissPairings():
     """Returns a list of pairs of players for the next round of a match.
@@ -108,14 +107,13 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-    conn = connect()
-    cur = conn.cursor()
+    db, cursor = connect()
     standing = iter(playerStandings())
     for i in standing:
         i
         second = next(standing)
-        cur.execute("INSERT INTO SwissPairings (ID1, name1, ID2, name2) VALUES ('%s', '%s', '%s', '%s');"%(i[0], i[1], second[0], second[1]))
+        cursor.execute("INSERT INTO SwissPairings (ID1, name1, ID2, name2) VALUES ('%s', '%s', '%s', '%s');"%(i[0], i[1], second[0], second[1]))
 
-    cur.execute("SELECT ID1, name1, ID2, name2 FROM SwissPairings;")
-    pairings = cur.fetchall()
+    cursor.execute("SELECT ID1, name1, ID2, name2 FROM SwissPairings;")
+    pairings = cursor.fetchall()
     return pairings
