@@ -8,7 +8,7 @@ import psycopg2
 def connect(database_name="tournament"):
     """Connect to the PostgreSQL database.  Returns a database connection."""
     try:
-        db = psycopg2.connect("dbname={}.format(database_name)")
+        db = psycopg2.connect("dbname={}".format(database_name))
         cursor = db.cursor()
         return db, cursor
     except:
@@ -17,7 +17,7 @@ def connect(database_name="tournament"):
 def deleteMatches():
     """Remove all the match records from the database."""
     db, cursor = connect()
-    cursor.execute("DELETE FROM Matches;")
+    cursor.execute("TRUNCATE Matches;")
     cursor.execute("UPDATE PlayerStanding SET Wins = 0, MatchesPlayed = 0;")
     db.commit()
     db.close()
@@ -26,8 +26,8 @@ def deleteMatches():
 def deletePlayers():
     """Remove all the player records from the database."""
     db, cursor = connect()
-    cursor.execute("DELETE FROM PlayerStanding cascade;")
-    cursor.execute("DELETE FROM Players cascade;")
+    cursor.execute("TRUNCATE PlayerStanding cascade;")
+    cursor.execute("TRUNCATE Players cascade;")
     cursor.execute("ALTER SEQUENCE Players_PlayerID_seq RESTART WITH 1;")
     cursor.execute("ALTER SEQUENCE PlayerStanding_PlayerID_seq RESTART WITH 1;")
     cursor.execute("ALTER SEQUENCE PlayerStanding_RoundID_seq RESTART WITH 1;")
@@ -39,7 +39,7 @@ def countPlayers():
     """Returns the number of players currently registered."""
     db, cursor = connect()
     cursor.execute("SELECT count(*) from Players;")
-    return cursor.fetchall()[0][0]
+    return cursor.fetchone()[0]
 
 
 def registerPlayer(name):
@@ -52,7 +52,9 @@ def registerPlayer(name):
       name: the player's full name (need not be unique).
     """
     db, cursor = connect()
-    cursor.execute("""INSERT INTO Players (FullName) VALUES ('%s');"""%name.replace("'", "''"))
+    query = "INSERT INTO Players (FullName) VALUES (%s);"
+    parameter = (name, )
+    cursor.execute(query, parameter)
     cursor.execute("INSERT INTO PlayerStanding (Wins, MatchesPlayed) VALUES (0, 0)")
     db.commit()
     db.close()
@@ -85,10 +87,10 @@ def reportMatch(winner, loser):
       loser:  the id number of the player who lost
     """
     db, cursor = connect()
-    cursor.execute("INSERT INTO Matches (WinnerID, LoserID) VALUES ('%s', '%s');"%(winner, loser))
-    cursor.execute("UPDATE PlayerStanding SET Wins=(SELECT Wins FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
-    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(winner, winner))
-    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;"%(loser, loser))
+    cursor.execute("INSERT INTO Matches (WinnerID, LoserID) VALUES ('%s', '%s');", (winner, loser))
+    cursor.execute("UPDATE PlayerStanding SET Wins=(SELECT Wins FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;", (winner, winner))
+    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;", (winner, winner))
+    cursor.execute("UPDATE PlayerStanding SET MatchesPlayed=(SELECT MatchesPlayed FROM PlayerStanding WHERE PlayerID=%s)+1 WHERE PlayerID = %s;", (loser, loser))
     db.commit()
     db.close()
 
